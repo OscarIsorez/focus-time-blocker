@@ -29,6 +29,11 @@ function renderBlockList(list) {
 
         li.appendChild(textSpan);
         li.appendChild(removeBtn);
+
+        // Add animation class
+        li.classList.add('fade-in');
+        setTimeout(() => li.classList.remove('fade-in'), 500);
+
         blockListUl.appendChild(li);
     });
 }

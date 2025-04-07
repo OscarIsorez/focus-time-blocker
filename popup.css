@@ -1,0 +1,129 @@
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Roboto:wght@400;500&display=swap');
+
+/* Global Styles */
+body {
+    font-family: 'Roboto', sans-serif;
+    width: 300px;
+    padding: 10px;
+    background-color: #f5f5dc; /* Beige background */
+    color: #2e4a3d; /* Dark green text */
+}
+
+h2, h3 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    color: #2e4a3d; /* Dark green */
+    text-align: center;
+}
+
+label {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    margin-bottom: 5px;
+    display: block;
+}
+
+input[type="text"], input[type="number"] {
+    font-family: 'Roboto', sans-serif;
+    width: 95%;
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #2e4a3d;
+    border-radius: 5px;
+    background-color: #ffffff;
+    color: #2e4a3d;
+    transition: border-color 0.3s ease;
+}
+
+input[type="text"]:focus, input[type="number"]:focus {
+    border-color: #4caf50; /* Light green */
+    outline: none;
+}
+
+button {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    background-color: #225e42; /* Dark green (sapin) */
+    color: #ffffff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+button:hover {
+    background-color: #3e8e41; /* Darker green */
+    transform: scale(1.05);
+}
+
+button:active {
+    transform: scale(0.95);
+}
+
+ul {
+    font-family: 'Roboto', sans-serif;
+    list-style: none;
+    padding: 0;
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #2e4a3d;
+    border-radius: 5px;
+    background-color: #ffffff;
+    margin-top: 10px;
+}
+
+li {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    animation: fadeIn 0.5s ease;
+}
+
+li:last-child {
+    border-bottom: none;
+}
+
+li button {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    background-color: #e57373; /* Light red */
+    color: #ffffff;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+li button:hover {
+    background-color: #d32f2f; /* Darker red */
+    transform: scale(1.05);
+}
+
+li button:active {
+    transform: scale(0.95);
+}
+
+#status {
+    font-family: 'Roboto', sans-serif;
+    margin-top: 15px;
+    font-weight: bold;
+    text-align: center;
+    color: #2e4a3d;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
