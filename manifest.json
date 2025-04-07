@@ -6,7 +6,8 @@
     "permissions": [
         "storage",
         "tabs",
-        "alarms"
+        "alarms",
+        "notifications"
     ],
     "host_permissions": [
         "<all_urls>"

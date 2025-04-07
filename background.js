@@ -127,14 +127,14 @@ async function checkActiveTabAndManageTime() {
 
         const allowedTimeMs = (allowedTimeMinutes ?? 30) * 60 * 1000;
 
-        // 1. Vérifiez si une pause est en cours
+        // 1. Check if a break is ongoing
         if (breakEndTime && now < breakEndTime) {
             console.log(`Currently on break until ${new Date(breakEndTime).toLocaleTimeString()}`);
             await chrome.storage.sync.set({ [STORAGE_KEYS.LAST_CHECK_TIME]: now });
             return;
         }
 
-        // 2. Réinitialisez l'état si la pause est terminée
+        // 2. Reset state if the break is over
         let updatedTimeSpent = currentTimeSpent;
         if (breakEndTime && now >= breakEndTime) {
             console.log("Break finished. Resetting timer.");
@@ -145,7 +145,7 @@ async function checkActiveTabAndManageTime() {
             });
         }
 
-        // 3. Vérifiez l'onglet actif
+        // 3. Check the active tab
         const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!activeTabs || activeTabs.length === 0) {
             console.log("No active tab found.");
@@ -160,7 +160,18 @@ async function checkActiveTabAndManageTime() {
 
             console.log(`Blocked site active (${activeTab.url}). Time spent: ${Math.round(updatedTimeSpent / 1000)}s / ${allowedTimeMinutes * 60}s`);
 
-            // 4. Vérifiez si la limite de temps est atteinte
+            // 4. Notify user if time is almost up
+            const remainingTimeMs = allowedTimeMs - updatedTimeSpent;
+            if (remainingTimeMs <= 60000 && remainingTimeMs > 0) { // Less than 1 minute remaining
+                chrome.notifications.create({
+                    type: 'basic',
+                    iconUrl: 'icons/ICON_16.png',
+                    title: 'Focus Time Blocker',
+                    message: 'You have less than 1 minute remaining on this site!'
+                });
+            }
+
+            // 5. Check if the time limit is reached
             if (updatedTimeSpent >= allowedTimeMs) {
                 console.log("Time limit exceeded. Starting break.");
                 const breakDurationMs = allowedTimeMs;
@@ -177,7 +188,7 @@ async function checkActiveTabAndManageTime() {
             }
         }
 
-        // 5. Mettez à jour le temps passé
+        // 6. Update time spent
         await chrome.storage.sync.set({
             [STORAGE_KEYS.TIME_SPENT]: updatedTimeSpent,
             [STORAGE_KEYS.LAST_CHECK_TIME]: now
