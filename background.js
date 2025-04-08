@@ -167,7 +167,14 @@ async function checkActiveTabAndManageTime() {
                     type: 'basic',
                     iconUrl: 'icons/ICON_16.png',
                     title: 'Focus Time Blocker',
-                    message: 'You have less than 1 minute remaining !'
+                    message: 'You have less than 1 minute remaining!'
+                });
+            } else if (remainingTimeMs <= 300000 && remainingTimeMs > 60000) { // Less than 5 minutes remaining
+                chrome.notifications.create({
+                    type: 'basic',
+                    iconUrl: 'icons/ICON_16.png',
+                    title: 'Focus Time Blocker',
+                    message: 'You have less than 5 minutes remaining!'
                 });
             }
 
