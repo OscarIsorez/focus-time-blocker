@@ -211,7 +211,7 @@ newEntryInput.addEventListener('keypress', (event) => {
 setInterval(async () => {
     try {
         const data = await chrome.storage.sync.get(['allowedTimeMinutes', 'timeSpent', 'breakEndTime']);
-        updateStatus(data.allowedTimeMinutes ?? 30, data.timeSpent ?? 0, data.breakEndTime ?? null);
+        updateStatus(data.allowedTimeMinutes ?? 0, data.timeSpent ?? 0, data.breakEndTime ?? null);
     } catch (error) {
         console.error("Error fetching status update:", error);
     }
