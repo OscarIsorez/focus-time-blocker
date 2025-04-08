@@ -167,7 +167,7 @@ async function checkActiveTabAndManageTime() {
                     type: 'basic',
                     iconUrl: 'icons/ICON_16.png',
                     title: 'Focus Time Blocker',
-                    message: 'You have less than 1 minute remaining on this site!'
+                    message: 'You have less than 1 minute remaining !'
                 });
             }
 

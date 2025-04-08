@@ -6,6 +6,8 @@ const blockListUl = document.getElementById('blockList');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 const statusDiv = document.getElementById('status');
 
+const BREAK_URL = 'https://www.google.com/';
+
 // --- Functions ---
 
 /**
@@ -168,19 +170,21 @@ async function updateStatus(allowedTime, timeSpent, breakEndTime) {
         // Check if the active URL is blocked
         const isBlocked = blockedEntries.some(entry => activeUrl.toLowerCase().includes(entry.toLowerCase()));
 
-        if (!isBlocked) {
-            statusDiv.textContent = ''; // Clear status if the site is not blocked
-            return;
-        }
-
-        if (breakEndTime && now < breakEndTime) {
+        if (breakEndTime && now < breakEndTime || activeUrl == BREAK_URL) {
             const breakMinsRemaining = Math.ceil((breakEndTime - now) / 60000);
             statusDiv.textContent = `On break for ${breakMinsRemaining} more min(s).`;
+            return;
         } else {
             const allowedMs = allowedTime * 60 * 1000;
             const remainingMs = Math.max(0, allowedMs - timeSpent);
             const remainingMins = Math.ceil(remainingMs / 60000);
             statusDiv.textContent = `Time remaining: ${remainingMins} min(s).`;
+
+        }
+        if (!isBlocked) {
+            statusDiv.textContent = ''; // Clear status if the site is not blocked
+            console.log("Not blocked, no status update needed.");
+            return;
         }
     } catch (error) {
         console.error("Error updating status:", error);
