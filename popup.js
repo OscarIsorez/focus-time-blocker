@@ -153,16 +153,38 @@ async function handleRemoveEntry(event) {
  * @param {number} timeSpent - Time spent in milliseconds.
  * @param {number | null} breakEndTime - Timestamp when break ends, or null.
  */
-function updateStatus(allowedTime, timeSpent, breakEndTime) {
+async function updateStatus(allowedTime, timeSpent, breakEndTime) {
     const now = Date.now();
-    if (breakEndTime && now < breakEndTime) {
-        const breakMinsRemaining = Math.ceil((breakEndTime - now) / 60000);
-        statusDiv.textContent = `On break for ${breakMinsRemaining} more min(s).`;
-    } else {
-        const allowedMs = allowedTime * 60 * 1000;
-        const remainingMs = Math.max(0, allowedMs - timeSpent);
-        const remainingMins = Math.ceil(remainingMs / 60000);
-        statusDiv.textContent = `Time remaining: ${remainingMins} min(s).`;
+
+    try {
+        // Get the active tab's URL
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const activeUrl = activeTab?.url ?? '';
+
+        // Fetch blocked entries from storage
+        const data = await chrome.storage.sync.get(['blockedEntries']);
+        const blockedEntries = data.blockedEntries ?? [];
+
+        // Check if the active URL is blocked
+        const isBlocked = blockedEntries.some(entry => activeUrl.toLowerCase().includes(entry.toLowerCase()));
+
+        if (!isBlocked) {
+            statusDiv.textContent = ''; // Clear status if the site is not blocked
+            return;
+        }
+
+        if (breakEndTime && now < breakEndTime) {
+            const breakMinsRemaining = Math.ceil((breakEndTime - now) / 60000);
+            statusDiv.textContent = `On break for ${breakMinsRemaining} more min(s).`;
+        } else {
+            const allowedMs = allowedTime * 60 * 1000;
+            const remainingMs = Math.max(0, allowedMs - timeSpent);
+            const remainingMins = Math.ceil(remainingMs / 60000);
+            statusDiv.textContent = `Time remaining: ${remainingMins} min(s).`;
+        }
+    } catch (error) {
+        console.error("Error updating status:", error);
+        statusDiv.textContent = "Error updating status.";
     }
 }
 
