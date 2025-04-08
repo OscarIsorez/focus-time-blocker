@@ -8,12 +8,20 @@
     <link rel="stylesheet" href="popup.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Roboto:wght@400;500&display=swap"
         rel="stylesheet">
-
-
 </head>
 
 <body>
     <h2>Focus Time Settings</h2>
+
+    <!-- New timer display section -->
+    <div id="timer-container">
+        <div id="timer-display">
+            <span id="timer-value">00:00</span>
+            <span id="timer-label">remaining</span>
+        </div>
+        <div id="status">Loading status...</div>
+    </div>
+
     <div>
         <label for="newEntry">Add Blocked URL/Keyword:</label>
         <input type="text" id="newEntry" placeholder="e.g., instagram.com or 'news'">
@@ -33,11 +41,6 @@
     <h3>Blocked List:</h3>
     <ul id="blockList">
     </ul>
-
-
-    <div id="status">
-        Loading status...
-    </div>
 
     <script src="popup.js"></script>
 </body>

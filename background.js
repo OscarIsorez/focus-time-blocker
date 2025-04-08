@@ -60,8 +60,8 @@ async function createTrackingAlarm() {
     try {
         const alarm = await chrome.alarms.get(CHECK_ALARM_NAME);
         if (!alarm) {
-            // Check every minute. Adjust frequency as needed (balance accuracy and performance)
-            chrome.alarms.create(CHECK_ALARM_NAME, { periodInMinutes: 1 });
+            // Check every 10 seconds for more responsive time tracking
+            chrome.alarms.create(CHECK_ALARM_NAME, { periodInMinutes: 0.16 }); // ~10 seconds
             console.log("Tracking alarm created.");
         } else {
             console.log("Tracking alarm already exists.");
@@ -156,7 +156,9 @@ async function checkActiveTabAndManageTime() {
         const activeTab = activeTabs[0];
         if (activeTab.url && isUrlBlocked(activeTab.url, blockedEntries)) {
             const timeElapsedMs = now - (lastCheckTimestamp ?? now);
-            updatedTimeSpent += timeElapsedMs;
+            // Cap the elapsed time to avoid huge jumps if the alarm was delayed
+            const cappedTimeElapsedMs = Math.min(timeElapsedMs, 30000); // Max 30 seconds
+            updatedTimeSpent += cappedTimeElapsedMs;
 
             console.log(`Blocked site active (${activeTab.url}). Time spent: ${Math.round(updatedTimeSpent / 1000)}s / ${allowedTimeMinutes * 60}s`);
 

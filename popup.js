@@ -6,8 +6,15 @@ const blockListUl = document.getElementById('blockList');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 const statusDiv = document.getElementById('status');
 const blockNowBtn = document.getElementById('blockNowBtn');
+const timerValueSpan = document.getElementById('timer-value');
+const timerContainer = document.getElementById('timer-container');
 
 const BREAK_URL = 'https://www.google.com/';
+
+// Variables for local timer tracking
+let localTimeSpent = 0;
+let localTimerInterval = null;
+let isOnBlockedSite = false;
 
 // --- Functions ---
 
@@ -29,16 +36,14 @@ function renderBlockList(list, isInBreak = false) {
 
         li.appendChild(textSpan);
 
-        // Only add remove button if not in a break period
         if (!isInBreak) {
             const removeBtn = document.createElement('button');
             removeBtn.textContent = 'Remove';
-            removeBtn.dataset.index = index; // Store index for removal
+            removeBtn.dataset.index = index;
             removeBtn.addEventListener('click', handleRemoveEntry);
             li.appendChild(removeBtn);
         }
 
-        // Add animation class
         li.classList.add('fade-in');
         setTimeout(() => li.classList.remove('fade-in'), 500);
 
@@ -52,15 +57,19 @@ function renderBlockList(list, isInBreak = false) {
 async function loadSettings() {
     try {
         const data = await chrome.storage.sync.get(['blockedEntries', 'allowedTimeMinutes', 'timeSpent', 'breakEndTime']);
-        console.log("Loaded settings:", data); // Debugging line
-        const allowedTime = data.allowedTimeMinutes ?? 30; // Default to 30 mins
-        const blockedEntries = data.blockedEntries ?? []; // Default to empty array
+        const allowedTime = data.allowedTimeMinutes ?? 30;
+        const blockedEntries = data.blockedEntries ?? [];
         const timeSpent = data.timeSpent ?? 0;
         const breakEndTime = data.breakEndTime ?? null;
 
-        // Check if currently in a break period
         const now = Date.now();
         const isInBreak = breakEndTime && now < breakEndTime;
+
+        if (!isInBreak && breakEndTime) {
+            localTimeSpent = 0;
+        }
+
+        localTimeSpent = timeSpent;
 
         timeLimitInput.value = allowedTime;
         renderBlockList(blockedEntries, isInBreak);
@@ -82,20 +91,16 @@ async function saveSettings() {
         return;
     }
 
-    // Get current block list from UI state (or storage if more robust needed)
-    // Here, we re-read from storage to ensure consistency
     const data = await chrome.storage.sync.get(['blockedEntries']);
     const currentBlockedEntries = data.blockedEntries ?? [];
 
     try {
         await chrome.storage.sync.set({
             allowedTimeMinutes: allowedTime,
-            blockedEntries: currentBlockedEntries // List is modified via add/remove handlers
+            blockedEntries: currentBlockedEntries
         });
-        // Optionally: Inform the background script settings changed if needed immediately
-        // await chrome.runtime.sendMessage({ type: "SETTINGS_UPDATED" });
         statusDiv.textContent = "Settings saved!";
-        setTimeout(() => updateStatus(allowedTime, data.timeSpent ?? 0, data.breakEndTime ?? null), 1500); // Revert status message
+        setTimeout(() => updateStatus(allowedTime, data.timeSpent ?? 0, data.breakEndTime ?? null), 1500);
     } catch (error) {
         console.error("Error saving settings:", error);
         statusDiv.textContent = "Error saving settings.";
@@ -107,7 +112,6 @@ async function saveSettings() {
  */
 async function handleAddEntry() {
     const newEntry = newEntryInput.value.trim().toLowerCase();
-    console.log("Adding entry:", newEntry);
     if (!newEntry) {
         alert("Please enter a URL or keyword to block.");
         return;
@@ -124,14 +128,13 @@ async function handleAddEntry() {
             const updatedList = [...currentList, newEntry];
             await chrome.storage.sync.set({
                 blockedEntries: updatedList,
-                // Also save the current time limit when adding an entry
                 allowedTimeMinutes: parseInt(timeLimitInput.value, 10)
             });
             renderBlockList(updatedList, isInBreak);
             newEntryInput.value = '';
-            statusDiv.textContent = `"${newEntry}" added. ⚠️ Click "Save Settings" to apply changes!`;
+            statusDiv.textContent = `${newEntry} added. ⚠️ Click "Save Settings" to apply changes!`;
         } else {
-            alert(`"${newEntry}" is already in the block list.`);
+            alert(`${newEntry} is already in the block list.`);
         }
     } catch (error) {
         console.error("Error adding entry:", error);
@@ -157,8 +160,8 @@ async function handleRemoveEntry(event) {
             const entryToRemove = currentList[indexToRemove];
             const updatedList = currentList.filter((_, index) => index !== indexToRemove);
             await chrome.storage.sync.set({ blockedEntries: updatedList });
-            renderBlockList(updatedList, isInBreak); // Update UI immediately
-            statusDiv.textContent = `"${entryToRemove}" removed. Remember to Save.`;
+            renderBlockList(updatedList, isInBreak);
+            statusDiv.textContent = `"${entryToRemove}" removed.Remember to Save.`;
         }
     } catch (error) {
         console.error("Error removing entry:", error);
@@ -175,44 +178,163 @@ async function handleRemoveEntry(event) {
 async function updateStatus(allowedTime, timeSpent, breakEndTime) {
     const now = Date.now();
 
+    if (localTimeSpent === 0 && timeSpent > 0) {
+        localTimeSpent = timeSpent;
+    }
+
+    if (breakEndTime && now >= breakEndTime) {
+        localTimeSpent = 0;
+        await chrome.storage.sync.set({
+            timeSpent: 0,
+            breakEndTime: null
+        });
+    }
+
     try {
-        // Get the active tab's URL
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         const activeUrl = activeTab?.url ?? '';
 
-        // Fetch blocked entries from storage
         const data = await chrome.storage.sync.get(['blockedEntries']);
         const blockedEntries = data.blockedEntries ?? [];
 
-        // Check if the active URL is blocked
         const isBlocked = blockedEntries.some(entry => activeUrl.toLowerCase().includes(entry.toLowerCase()));
 
-        // Only show break message if we're actually in a break (time hasn't expired)
-        if (breakEndTime && now < breakEndTime) {
-            const breakMinsRemaining = Math.ceil((breakEndTime - now) / 60000);
-            statusDiv.textContent = `On break for ${breakMinsRemaining} more min(s).`;
-            return;
-        } else if (activeUrl == BREAK_URL) {
-            statusDiv.textContent = `Take a breath.`;
-            return;
-        } else {
-            const allowedMs = allowedTime * 60 * 1000;
-            const remainingMs = Math.max(0, allowedMs - timeSpent);
-            const remainingMins = Math.ceil(remainingMs / 60000);
-            statusDiv.textContent = `Time remaining: ${remainingMins} min(s).`;
-
-            // Only clear the status when both conditions are true:
-            // 1. The site is not blocked
-            // 2. We're not on the break URL
-            if (!isBlocked && activeUrl !== BREAK_URL) {
-                statusDiv.textContent = ''; // Clear status if not a blocked site
-                console.log("Not blocked, no status update needed.");
-                return;
+        if (isBlocked !== isOnBlockedSite) {
+            isOnBlockedSite = isBlocked;
+            if (isBlocked) {
+                startLocalTimer();
+            } else {
+                stopLocalTimer();
             }
+        }
+
+        if (breakEndTime && now < breakEndTime) {
+            const breakRemainingMs = breakEndTime - now;
+            const breakMins = Math.floor(breakRemainingMs / 60000);
+            const breakSecs = Math.floor((breakRemainingMs % 60000) / 1000);
+
+            displayTimer(`${String(breakMins).padStart(2, '0')}:${String(breakSecs).padStart(2, '0')}`, true);
+            statusDiv.textContent = `On break - timer will resume soon`;
+            timerContainer.style.display = 'block';
+        } else if (activeUrl === BREAK_URL) {
+            displayTimer("00:00", false);
+            statusDiv.textContent = `Take a breath.`;
+            timerContainer.style.display = 'block';
+        } else if (isBlocked) {
+            const allowedMs = allowedTime * 60 * 1000;
+            const remainingMs = Math.max(0, allowedMs - localTimeSpent);
+
+            const mins = Math.floor(remainingMs / 60000);
+            const secs = Math.floor((remainingMs % 60000) / 1000);
+
+            displayTimer(`${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`, false);
+
+            if (remainingMs <= 1000) {
+                statusDiv.textContent = "Time's up! Redirecting...";
+            } else {
+                statusDiv.textContent = `Blocked site - time remaining`;
+            }
+
+            timerContainer.style.display = 'block';
+
+            await syncTimeWithStorage();
+        } else {
+            timerContainer.style.display = 'none';
+            statusDiv.textContent = 'No blocked sites active';
         }
     } catch (error) {
         console.error("Error updating status:", error);
         statusDiv.textContent = "Error updating status.";
+        displayTimer("--:--", false);
+        timerContainer.style.display = 'block';
+    }
+}
+
+/**
+ * Helper function to display timer and manage classes
+ * @param {string} timeText - Formatted time to display
+ * @param {boolean} isBreak - Whether this is break time
+ */
+function displayTimer(timeText, isBreak) {
+    timerValueSpan.textContent = timeText;
+    if (isBreak) {
+        timerValueSpan.classList.add('break-time');
+    } else {
+        timerValueSpan.classList.remove('break-time');
+    }
+}
+
+/**
+ * Starts the local timer to track time spent on blocked sites
+ */
+function startLocalTimer() {
+    if (localTimerInterval) {
+        clearInterval(localTimerInterval);
+    }
+
+    localTimerInterval = setInterval(() => {
+        localTimeSpent += 1000;
+        updateTimerUI();
+    }, 1000);
+}
+
+/**
+ * Stops the local timer
+ */
+function stopLocalTimer() {
+    if (localTimerInterval) {
+        clearInterval(localTimerInterval);
+        localTimerInterval = null;
+        syncTimeWithStorage();
+    }
+}
+
+/**
+ * Updates just the timer UI without fetching from storage
+ */
+function updateTimerUI() {
+    try {
+        if (!isOnBlockedSite) return;
+
+        const allowedTime = parseInt(timeLimitInput.value, 10) || 30;
+        const allowedMs = allowedTime * 60 * 1000;
+        const remainingMs = Math.max(0, allowedMs - localTimeSpent);
+
+        const mins = Math.floor(remainingMs / 60000);
+        const secs = Math.floor((remainingMs % 60000) / 1000);
+
+        displayTimer(`${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`, false);
+
+        if (remainingMs <= 1000) {
+            statusDiv.textContent = "Time's up! Redirecting...";
+        }
+    } catch (error) {
+        console.error("Error updating timer UI:", error);
+    }
+}
+
+/**
+ * Synchronizes the local time with storage
+ */
+async function syncTimeWithStorage() {
+    try {
+        const data = await chrome.storage.sync.get(['timeSpent', 'breakEndTime']);
+        const storageTimeSpent = data.timeSpent ?? 0;
+        const breakEndTime = data.breakEndTime ?? null;
+        const now = Date.now();
+
+        if (breakEndTime && now > breakEndTime) {
+            localTimeSpent = 0;
+            return;
+        }
+
+        if (localTimeSpent > storageTimeSpent) {
+            await chrome.storage.sync.set({ timeSpent: localTimeSpent });
+        } else if (storageTimeSpent > localTimeSpent) {
+            localTimeSpent = storageTimeSpent;
+        }
+    } catch (error) {
+        console.error("Error syncing time with storage:", error);
     }
 }
 
@@ -221,30 +343,23 @@ async function updateStatus(allowedTime, timeSpent, breakEndTime) {
  */
 async function handleBlockNow() {
     try {
-        // Get current settings
         const data = await chrome.storage.sync.get(['allowedTimeMinutes', 'blockedEntries']);
         const allowedTimeMinutes = data.allowedTimeMinutes ?? 30;
         const allowedTimeMs = allowedTimeMinutes * 60 * 1000;
         const blockedEntries = data.blockedEntries ?? [];
 
-        // Set time spent to equal allowed time (no time remaining)
         const now = Date.now();
         const newBreakEndTime = now + allowedTimeMs;
 
-        // Save to storage
         await chrome.storage.sync.set({
             timeSpent: allowedTimeMs,
             breakEndTime: newBreakEndTime,
             lastCheckTimestamp: now
         });
 
-        // Update status
         statusDiv.textContent = "Break started! Sites will be blocked.";
-
-        // Immediately update the UI to reflect break state
         renderBlockList(blockedEntries, true);
 
-        // Get active tab to immediately redirect if it contains blocked keywords
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (activeTab && activeTab.url) {
             const isBlocked = blockedEntries.some(entry =>
@@ -253,11 +368,11 @@ async function handleBlockNow() {
 
             if (isBlocked) {
                 await chrome.tabs.update(activeTab.id, { url: BREAK_URL });
-                console.log("Active tab redirected to break URL");
             }
         }
 
-        // Update UI
+        timerContainer.style.display = 'block';
+
         setTimeout(() => {
             updateStatus(allowedTimeMinutes, allowedTimeMs, newBreakEndTime);
         }, 1500);
@@ -269,26 +384,58 @@ async function handleBlockNow() {
 }
 
 // --- Event Listeners ---
-document.addEventListener('DOMContentLoaded', loadSettings);
+document.addEventListener('DOMContentLoaded', async () => {
+    timerContainer.style.display = 'none';
+
+    localTimeSpent = 0;
+
+    const data = await chrome.storage.sync.get(['breakEndTime', 'timeSpent']);
+    const breakEndTime = data.breakEndTime ?? null;
+    const timeSpent = data.timeSpent ?? 0;
+    const now = Date.now();
+
+    if (breakEndTime && now > breakEndTime) {
+        await chrome.storage.sync.set({
+            timeSpent: 0,
+            breakEndTime: null
+        });
+    } else {
+        localTimeSpent = timeSpent;
+    }
+
+    loadSettings();
+});
 addEntryBtn.addEventListener('click', handleAddEntry);
 saveSettingsBtn.addEventListener('click', saveSettings);
 blockNowBtn.addEventListener('click', handleBlockNow);
 
-// Add listener for Enter key in the input field
+window.addEventListener('beforeunload', () => {
+    syncTimeWithStorage();
+    stopLocalTimer();
+});
+
+chrome.tabs.onActivated.addListener(() => {
+    loadSettings();
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.url) {
+        loadSettings();
+    }
+});
+
 newEntryInput.addEventListener('keypress', (event) => {
     if (event.key === 'Enter') {
-        event.preventDefault(); // Prevent form submission if it were in a form
+        event.preventDefault();
         handleAddEntry();
     }
 });
 
-// --- Periodic Status Update (Optional but good UX) ---
-// Fetch latest status from background or storage periodically while popup is open
 setInterval(async () => {
     try {
         const data = await chrome.storage.sync.get(['allowedTimeMinutes', 'timeSpent', 'breakEndTime']);
-        updateStatus(data.allowedTimeMinutes ?? 0, data.timeSpent ?? 0, data.breakEndTime ?? null);
+        updateStatus(data.allowedTimeMinutes ?? 30, data.timeSpent ?? 0, data.breakEndTime ?? null);
     } catch (error) {
         console.error("Error fetching status update:", error);
     }
-}, 5000); // Update status every 5 seconds
+}, 1000);

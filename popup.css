@@ -12,6 +12,67 @@ body {
     /* Dark green text */
 }
 
+/* New timer styles */
+#timer-container {
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 12px;
+    margin-bottom: 15px;
+    text-align: center;
+    border: 2px solid #2e4a3d;
+    transition: opacity 0.3s ease, height 0.3s ease;
+}
+
+#timer-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+#timer-value {
+    font-family: 'Poppins', sans-serif;
+    font-size: 28px;
+    font-weight: 600;
+    color: #2e4a3d;
+    transition: color 0.3s ease;
+}
+
+#timer-value.break-time {
+    color: #d32f2f;
+    /* Red color for break time */
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+#timer-label {
+    font-size: 14px;
+    color: #555;
+    margin-top: -2px;
+}
+
+#status {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    color: #2e4a3d;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
 h2,
 h3 {
     font-family: 'Poppins', sans-serif;
