@@ -6,14 +6,18 @@ body {
     font-family: 'Roboto', sans-serif;
     width: 300px;
     padding: 10px;
-    background-color: #f5f5dc; /* Beige background */
-    color: #2e4a3d; /* Dark green text */
+    background-color: #f5f5dc;
+    /* Beige background */
+    color: #2e4a3d;
+    /* Dark green text */
 }
 
-h2, h3 {
+h2,
+h3 {
     font-family: 'Poppins', sans-serif;
     font-weight: 600;
-    color: #2e4a3d; /* Dark green */
+    color: #2e4a3d;
+    /* Dark green */
     text-align: center;
 }
 
@@ -24,7 +28,8 @@ label {
     display: block;
 }
 
-input[type="text"], input[type="number"] {
+input[type="text"],
+input[type="number"] {
     font-family: 'Roboto', sans-serif;
     width: 95%;
     padding: 8px;
@@ -36,15 +41,18 @@ input[type="text"], input[type="number"] {
     transition: border-color 0.3s ease;
 }
 
-input[type="text"]:focus, input[type="number"]:focus {
-    border-color: #4caf50; /* Light green */
+input[type="text"]:focus,
+input[type="number"]:focus {
+    border-color: #4caf50;
+    /* Light green */
     outline: none;
 }
 
 button {
     font-family: 'Poppins', sans-serif;
     font-weight: 600;
-    background-color: #225e42; /* Dark green (sapin) */
+    background-color: #225e42;
+    /* Dark green (sapin) */
     color: #ffffff;
     border: none;
     padding: 8px 12px;
@@ -54,12 +62,25 @@ button {
 }
 
 button:hover {
-    background-color: #3e8e41; /* Darker green */
+    background-color: #3e8e41;
+    /* Darker green */
     transform: scale(1.05);
 }
 
 button:active {
     transform: scale(0.95);
+}
+
+/* Block Now button styling */
+button.block-now {
+    background-color: #d32f2f;
+    /* Red color to indicate immediate action */
+    margin-left: 10px;
+}
+
+button.block-now:hover {
+    background-color: #b71c1c;
+    /* Darker red on hover */
 }
 
 ul {
@@ -90,7 +111,8 @@ li:last-child {
 li button {
     font-family: 'Poppins', sans-serif;
     font-weight: 600;
-    background-color: #e57373; /* Light red */
+    background-color: #e57373;
+    /* Light red */
     color: #ffffff;
     border: none;
     padding: 5px 10px;
@@ -100,7 +122,8 @@ li button {
 }
 
 li button:hover {
-    background-color: #d32f2f; /* Darker red */
+    background-color: #d32f2f;
+    /* Darker red */
     transform: scale(1.05);
 }
 
@@ -122,6 +145,7 @@ li button:active {
         opacity: 0;
         transform: translateY(-10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);

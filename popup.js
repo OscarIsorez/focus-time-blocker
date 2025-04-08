@@ -5,6 +5,7 @@ const addEntryBtn = document.getElementById('addEntryBtn');
 const blockListUl = document.getElementById('blockList');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 const statusDiv = document.getElementById('status');
+const blockNowBtn = document.getElementById('blockNowBtn');
 
 const BREAK_URL = 'https://www.google.com/';
 
@@ -13,8 +14,9 @@ const BREAK_URL = 'https://www.google.com/';
 /**
  * Renders the block list in the popup UI.
  * @param {string[]} list - Array of blocked URLs/keywords.
+ * @param {boolean} isInBreak - Whether we're currently in a break period.
  */
-function renderBlockList(list) {
+function renderBlockList(list, isInBreak = false) {
     blockListUl.innerHTML = ''; // Clear existing list
     if (!list || list.length === 0) {
         blockListUl.innerHTML = '<li>No sites/keywords blocked yet.</li>';
@@ -24,13 +26,17 @@ function renderBlockList(list) {
         const li = document.createElement('li');
         const textSpan = document.createElement('span');
         textSpan.textContent = entry;
-        const removeBtn = document.createElement('button');
-        removeBtn.textContent = 'Remove';
-        removeBtn.dataset.index = index; // Store index for removal
-        removeBtn.addEventListener('click', handleRemoveEntry);
 
         li.appendChild(textSpan);
-        li.appendChild(removeBtn);
+
+        // Only add remove button if not in a break period
+        if (!isInBreak) {
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = 'Remove';
+            removeBtn.dataset.index = index; // Store index for removal
+            removeBtn.addEventListener('click', handleRemoveEntry);
+            li.appendChild(removeBtn);
+        }
 
         // Add animation class
         li.classList.add('fade-in');
@@ -52,8 +58,12 @@ async function loadSettings() {
         const timeSpent = data.timeSpent ?? 0;
         const breakEndTime = data.breakEndTime ?? null;
 
+        // Check if currently in a break period
+        const now = Date.now();
+        const isInBreak = breakEndTime && now < breakEndTime;
+
         timeLimitInput.value = allowedTime;
-        renderBlockList(blockedEntries);
+        renderBlockList(blockedEntries, isInBreak);
         updateStatus(allowedTime, timeSpent, breakEndTime);
 
     } catch (error) {
@@ -104,8 +114,11 @@ async function handleAddEntry() {
     }
 
     try {
-        const data = await chrome.storage.sync.get(['blockedEntries']);
+        const data = await chrome.storage.sync.get(['blockedEntries', 'breakEndTime']);
         const currentList = data.blockedEntries ?? [];
+        const breakEndTime = data.breakEndTime ?? null;
+        const now = Date.now();
+        const isInBreak = breakEndTime && now < breakEndTime;
 
         if (!currentList.includes(newEntry)) {
             const updatedList = [...currentList, newEntry];
@@ -114,7 +127,7 @@ async function handleAddEntry() {
                 // Also save the current time limit when adding an entry
                 allowedTimeMinutes: parseInt(timeLimitInput.value, 10)
             });
-            renderBlockList(updatedList);
+            renderBlockList(updatedList, isInBreak);
             newEntryInput.value = '';
             statusDiv.textContent = `"${newEntry}" added. ⚠️ Click "Save Settings" to apply changes!`;
         } else {
@@ -125,6 +138,7 @@ async function handleAddEntry() {
         statusDiv.textContent = "Error adding entry.";
     }
 }
+
 /**
  * Handles removing an entry from the block list based on button click.
  * @param {Event} event - The click event from the remove button.
@@ -133,14 +147,17 @@ async function handleRemoveEntry(event) {
     const indexToRemove = parseInt(event.target.dataset.index, 10);
 
     try {
-        const data = await chrome.storage.sync.get(['blockedEntries']);
+        const data = await chrome.storage.sync.get(['blockedEntries', 'breakEndTime']);
         const currentList = data.blockedEntries ?? [];
+        const breakEndTime = data.breakEndTime ?? null;
+        const now = Date.now();
+        const isInBreak = breakEndTime && now < breakEndTime;
 
         if (indexToRemove >= 0 && indexToRemove < currentList.length) {
             const entryToRemove = currentList[indexToRemove];
             const updatedList = currentList.filter((_, index) => index !== indexToRemove);
             await chrome.storage.sync.set({ blockedEntries: updatedList });
-            renderBlockList(updatedList); // Update UI immediately
+            renderBlockList(updatedList, isInBreak); // Update UI immediately
             statusDiv.textContent = `"${entryToRemove}" removed. Remember to Save.`;
         }
     } catch (error) {
@@ -170,9 +187,13 @@ async function updateStatus(allowedTime, timeSpent, breakEndTime) {
         // Check if the active URL is blocked
         const isBlocked = blockedEntries.some(entry => activeUrl.toLowerCase().includes(entry.toLowerCase()));
 
-        if (breakEndTime && now < breakEndTime || activeUrl == BREAK_URL) {
+        // Only show break message if we're actually in a break (time hasn't expired)
+        if (breakEndTime && now < breakEndTime) {
             const breakMinsRemaining = Math.ceil((breakEndTime - now) / 60000);
             statusDiv.textContent = `On break for ${breakMinsRemaining} more min(s).`;
+            return;
+        } else if (activeUrl == BREAK_URL) {
+            statusDiv.textContent = `Take a breath.`;
             return;
         } else {
             const allowedMs = allowedTime * 60 * 1000;
@@ -180,11 +201,14 @@ async function updateStatus(allowedTime, timeSpent, breakEndTime) {
             const remainingMins = Math.ceil(remainingMs / 60000);
             statusDiv.textContent = `Time remaining: ${remainingMins} min(s).`;
 
-        }
-        if (!isBlocked) {
-            statusDiv.textContent = ''; // Clear status if the site is not blocked
-            console.log("Not blocked, no status update needed.");
-            return;
+            // Only clear the status when both conditions are true:
+            // 1. The site is not blocked
+            // 2. We're not on the break URL
+            if (!isBlocked && activeUrl !== BREAK_URL) {
+                statusDiv.textContent = ''; // Clear status if not a blocked site
+                console.log("Not blocked, no status update needed.");
+                return;
+            }
         }
     } catch (error) {
         console.error("Error updating status:", error);
@@ -192,11 +216,63 @@ async function updateStatus(allowedTime, timeSpent, breakEndTime) {
     }
 }
 
+/**
+ * Immediately sets remaining time to 0 and starts a break period
+ */
+async function handleBlockNow() {
+    try {
+        // Get current settings
+        const data = await chrome.storage.sync.get(['allowedTimeMinutes', 'blockedEntries']);
+        const allowedTimeMinutes = data.allowedTimeMinutes ?? 30;
+        const allowedTimeMs = allowedTimeMinutes * 60 * 1000;
+        const blockedEntries = data.blockedEntries ?? [];
+
+        // Set time spent to equal allowed time (no time remaining)
+        const now = Date.now();
+        const newBreakEndTime = now + allowedTimeMs;
+
+        // Save to storage
+        await chrome.storage.sync.set({
+            timeSpent: allowedTimeMs,
+            breakEndTime: newBreakEndTime,
+            lastCheckTimestamp: now
+        });
+
+        // Update status
+        statusDiv.textContent = "Break started! Sites will be blocked.";
+
+        // Immediately update the UI to reflect break state
+        renderBlockList(blockedEntries, true);
+
+        // Get active tab to immediately redirect if it contains blocked keywords
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (activeTab && activeTab.url) {
+            const isBlocked = blockedEntries.some(entry =>
+                activeTab.url.toLowerCase().includes(entry.toLowerCase())
+            );
+
+            if (isBlocked) {
+                await chrome.tabs.update(activeTab.id, { url: BREAK_URL });
+                console.log("Active tab redirected to break URL");
+            }
+        }
+
+        // Update UI
+        setTimeout(() => {
+            updateStatus(allowedTimeMinutes, allowedTimeMs, newBreakEndTime);
+        }, 1500);
+
+    } catch (error) {
+        console.error("Error triggering immediate block:", error);
+        statusDiv.textContent = "Error starting break.";
+    }
+}
 
 // --- Event Listeners ---
 document.addEventListener('DOMContentLoaded', loadSettings);
 addEntryBtn.addEventListener('click', handleAddEntry);
 saveSettingsBtn.addEventListener('click', saveSettings);
+blockNowBtn.addEventListener('click', handleBlockNow);
 
 // Add listener for Enter key in the input field
 newEntryInput.addEventListener('keypress', (event) => {
