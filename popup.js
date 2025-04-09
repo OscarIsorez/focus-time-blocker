@@ -3,7 +3,7 @@ const timeLimitInput = document.getElementById('timeLimit');
 const newEntryInput = document.getElementById('newEntry');
 const addEntryBtn = document.getElementById('addEntryBtn');
 const blockListUl = document.getElementById('blockList');
-const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+const UpdateSettingsBtn = document.getElementById('saveSettingsBtn');
 const statusDiv = document.getElementById('status');
 const blockNowBtn = document.getElementById('blockNowBtn');
 const timerValueSpan = document.getElementById('timer-value');
@@ -22,8 +22,9 @@ let isOnBlockedSite = false;
  * Renders the block list in the popup UI.
  * @param {string[]} list - Array of blocked URLs/keywords.
  * @param {boolean} isInBreak - Whether we're currently in a break period.
+ * @param {boolean} isTimerActive - Whether a timer is currently active.
  */
-function renderBlockList(list, isInBreak = false) {
+function renderBlockList(list, isInBreak = false, isTimerActive = false) {
     blockListUl.innerHTML = ''; // Clear existing list
     if (!list || list.length === 0) {
         blockListUl.innerHTML = '<li>No sites/keywords blocked yet.</li>';
@@ -41,6 +42,14 @@ function renderBlockList(list, isInBreak = false) {
             removeBtn.textContent = 'Remove';
             removeBtn.dataset.index = index;
             removeBtn.addEventListener('click', handleRemoveEntry);
+
+            // Disable remove button when timer is active
+            if (isTimerActive) {
+                removeBtn.disabled = true;
+                removeBtn.classList.add('disabled');
+                removeBtn.title = "Cannot remove sites while timer is active";
+            }
+
             li.appendChild(removeBtn);
         }
 
@@ -72,7 +81,10 @@ async function loadSettings() {
         localTimeSpent = timeSpent;
 
         timeLimitInput.value = allowedTime;
-        renderBlockList(blockedEntries, isInBreak);
+
+        // Get timer status to determine if remove buttons should be disabled
+        const isTimerActive = (isInBreak || (isOnBlockedSite && localTimeSpent > 0));
+        renderBlockList(blockedEntries, isInBreak, isTimerActive);
         updateStatus(allowedTime, timeSpent, breakEndTime);
 
     } catch (error) {
@@ -130,7 +142,11 @@ async function handleAddEntry() {
                 blockedEntries: updatedList,
                 allowedTimeMinutes: parseInt(timeLimitInput.value, 10)
             });
-            renderBlockList(updatedList, isInBreak);
+
+            // Get timer status to properly render remove buttons
+            const isTimerActive = (isInBreak || (isOnBlockedSite && localTimeSpent > 0));
+            renderBlockList(updatedList, isInBreak, isTimerActive);
+
             newEntryInput.value = '';
             statusDiv.textContent = `${newEntry} added. ⚠️ Click "Save Settings" to apply changes!`;
         } else {
@@ -160,7 +176,11 @@ async function handleRemoveEntry(event) {
             const entryToRemove = currentList[indexToRemove];
             const updatedList = currentList.filter((_, index) => index !== indexToRemove);
             await chrome.storage.sync.set({ blockedEntries: updatedList });
-            renderBlockList(updatedList, isInBreak);
+
+            // Also check for timer activity here
+            const isTimerActive = (isInBreak || (isOnBlockedSite && localTimeSpent > 0));
+            renderBlockList(updatedList, isInBreak, isTimerActive);
+
             statusDiv.textContent = `"${entryToRemove}" removed.Remember to Save.`;
         }
     } catch (error) {
@@ -238,6 +258,9 @@ async function updateStatus(allowedTime, timeSpent, breakEndTime) {
             } else {
                 statusDiv.textContent = `Blocked site - time remaining`;
                 isTimerActive = true;
+
+                // Re-render the block list to disable remove buttons
+                renderBlockList(blockedEntries, false, true);
             }
 
             timerContainer.style.display = 'block';
@@ -249,7 +272,7 @@ async function updateStatus(allowedTime, timeSpent, breakEndTime) {
         }
 
         // Update the save button state based on timer activity
-        updateSaveButtonState(isTimerActive);
+        updateUpdateButtonState(isTimerActive);
 
     } catch (error) {
         console.error("Error updating status:", error);
@@ -263,15 +286,15 @@ async function updateStatus(allowedTime, timeSpent, breakEndTime) {
  * Updates the save button state - enabling or disabling it based on timer status
  * @param {boolean} isTimerActive - Whether a timer is currently active
  */
-function updateSaveButtonState(isTimerActive) {
+function updateUpdateButtonState(isTimerActive) {
     if (isTimerActive) {
-        saveSettingsBtn.disabled = true;
-        saveSettingsBtn.classList.add('disabled');
-        saveSettingsBtn.title = "Cannot update settings while timer is active";
+        UpdateSettingsBtn.disabled = true;
+        UpdateSettingsBtn.classList.add('disabled');
+        UpdateSettingsBtn.title = "Cannot update settings while timer is active";
     } else {
-        saveSettingsBtn.disabled = false;
-        saveSettingsBtn.classList.remove('disabled');
-        saveSettingsBtn.title = "Save current settings";
+        UpdateSettingsBtn.disabled = false;
+        UpdateSettingsBtn.classList.remove('disabled');
+        UpdateSettingsBtn.title = "Save current settings";
     }
 }
 
@@ -333,10 +356,10 @@ function updateTimerUI() {
         if (remainingMs <= 1000) {
             statusDiv.textContent = "Time's up! Redirecting...";
             // Button can be enabled once time is up
-            updateSaveButtonState(false);
+            updateUpdateButtonState(false);
         } else {
             // Disable button while timer is running
-            updateSaveButtonState(true);
+            updateUpdateButtonState(true);
         }
     } catch (error) {
         console.error("Error updating timer UI:", error);
@@ -388,7 +411,7 @@ async function handleBlockNow() {
         });
 
         statusDiv.textContent = "Break started! Sites will be blocked.";
-        renderBlockList(blockedEntries, true);
+        renderBlockList(blockedEntries, true, true);
 
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (activeTab && activeTab.url) {
@@ -404,7 +427,7 @@ async function handleBlockNow() {
         timerContainer.style.display = 'block';
 
         // Disable settings button when break starts
-        updateSaveButtonState(true);
+        updateUpdateButtonState(true);
 
         setTimeout(() => {
             updateStatus(allowedTimeMinutes, allowedTimeMs, newBreakEndTime);
@@ -439,10 +462,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadSettings();
 
     // Initialize button state (enabled by default)
-    updateSaveButtonState(false);
+    updateUpdateButtonState(false);
 });
 addEntryBtn.addEventListener('click', handleAddEntry);
-saveSettingsBtn.addEventListener('click', saveSettings);
+UpdateSettingsBtn.addEventListener('click', saveSettings);
 blockNowBtn.addEventListener('click', handleBlockNow);
 
 window.addEventListener('beforeunload', () => {
