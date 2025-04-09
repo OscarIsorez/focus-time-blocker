@@ -132,6 +132,21 @@ button:active {
     transform: scale(0.95);
 }
 
+/* Button disabled state */
+button:disabled,
+button.disabled {
+    background-color: #cccccc;
+    color: #666666;
+    cursor: not-allowed;
+    transform: none;
+}
+
+button:disabled:hover,
+button.disabled:hover {
+    background-color: #cccccc;
+    transform: none;
+}
+
 /* Block Now button styling */
 button.block-now {
     background-color: #d32f2f;

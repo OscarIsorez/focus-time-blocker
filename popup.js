@@ -208,6 +208,9 @@ async function updateStatus(allowedTime, timeSpent, breakEndTime) {
             }
         }
 
+        // Check if any timer is active to disable the settings button
+        let isTimerActive = false;
+
         if (breakEndTime && now < breakEndTime) {
             const breakRemainingMs = breakEndTime - now;
             const breakMins = Math.floor(breakRemainingMs / 60000);
@@ -216,6 +219,7 @@ async function updateStatus(allowedTime, timeSpent, breakEndTime) {
             displayTimer(`${String(breakMins).padStart(2, '0')}:${String(breakSecs).padStart(2, '0')}`, true);
             statusDiv.textContent = `On break - timer will resume soon`;
             timerContainer.style.display = 'block';
+            isTimerActive = true;
         } else if (activeUrl === BREAK_URL) {
             displayTimer("00:00", false);
             statusDiv.textContent = `Take a breath.`;
@@ -233,6 +237,7 @@ async function updateStatus(allowedTime, timeSpent, breakEndTime) {
                 statusDiv.textContent = "Time's up! Redirecting...";
             } else {
                 statusDiv.textContent = `Blocked site - time remaining`;
+                isTimerActive = true;
             }
 
             timerContainer.style.display = 'block';
@@ -242,11 +247,31 @@ async function updateStatus(allowedTime, timeSpent, breakEndTime) {
             timerContainer.style.display = 'none';
             statusDiv.textContent = 'No blocked sites active';
         }
+
+        // Update the save button state based on timer activity
+        updateSaveButtonState(isTimerActive);
+
     } catch (error) {
         console.error("Error updating status:", error);
         statusDiv.textContent = "Error updating status.";
         displayTimer("--:--", false);
         timerContainer.style.display = 'block';
+    }
+}
+
+/**
+ * Updates the save button state - enabling or disabling it based on timer status
+ * @param {boolean} isTimerActive - Whether a timer is currently active
+ */
+function updateSaveButtonState(isTimerActive) {
+    if (isTimerActive) {
+        saveSettingsBtn.disabled = true;
+        saveSettingsBtn.classList.add('disabled');
+        saveSettingsBtn.title = "Cannot update settings while timer is active";
+    } else {
+        saveSettingsBtn.disabled = false;
+        saveSettingsBtn.classList.remove('disabled');
+        saveSettingsBtn.title = "Save current settings";
     }
 }
 
@@ -307,6 +332,11 @@ function updateTimerUI() {
 
         if (remainingMs <= 1000) {
             statusDiv.textContent = "Time's up! Redirecting...";
+            // Button can be enabled once time is up
+            updateSaveButtonState(false);
+        } else {
+            // Disable button while timer is running
+            updateSaveButtonState(true);
         }
     } catch (error) {
         console.error("Error updating timer UI:", error);
@@ -373,6 +403,9 @@ async function handleBlockNow() {
 
         timerContainer.style.display = 'block';
 
+        // Disable settings button when break starts
+        updateSaveButtonState(true);
+
         setTimeout(() => {
             updateStatus(allowedTimeMinutes, allowedTimeMs, newBreakEndTime);
         }, 1500);
@@ -404,6 +437,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     loadSettings();
+
+    // Initialize button state (enabled by default)
+    updateSaveButtonState(false);
 });
 addEntryBtn.addEventListener('click', handleAddEntry);
 saveSettingsBtn.addEventListener('click', saveSettings);
